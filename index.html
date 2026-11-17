@@ -308,7 +308,8 @@ function pdate(s){s=(s||"").trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/)
 // Sheet layout: A Wing, B Region, C Territory, then 7 category blocks (CSD, Water, RB Oil, Noodles, Rice, Sugar, Tea) of 7 columns each:
 // Target, Till Tar, Primary, Delivery, Secondary, Sec %, Stock. Stock is read (v[4]); Sec % column is not used.
 function parse(t){const R=csv(t);let off=num((R[0]||[])[1]),dt=null; // Day Off is always read from cell B1
-dt=pdate((R[0]||[])[4]); // Latest date is always read from cell E1
+dt=null;{const e=String((R[0]||[])[4]||"").trim(),T=new Date(); // Latest date: E1 holds the day number (e.g. 16) of the current month
+if(/^\d{1,2}$/.test(e)){const n=+e;if(n>=1&&n<=31){const mo=n>T.getDate()?T.getMonth()-1:T.getMonth();dt=new Date(T.getFullYear(),mo,n)}}else dt=pdate(e)}
 if(!dt)R.slice(0,3).forEach(r=>r.forEach((c,i)=>{const k=(c||"").trim().toLowerCase();if(k.startsWith("date"))dt=pdate(r.slice(i+1).find(x=>x&&x.trim()))}));
 const rows=R.filter((r,ri)=>ri>0&&r[0]&&r[1]&&r[2]&&r[0].trim().toLowerCase()!="wing"&&/\d/.test(r[3]||"")).map(r=>[r[0].trim(),r[1].trim(),r[2].trim(),...CATS.map((_,i)=>{const b=3+7*i;return[num(r[b]),num(r[b+2]),num(r[b+3]),num(r[b+4]),num(r[b+6]),num(r[b+1])]})]);
 if(!rows.length)throw new Error("no data rows found");return{rows,off,dt}}
