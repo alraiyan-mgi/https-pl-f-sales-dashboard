@@ -305,14 +305,16 @@ const SRC=["https://docs.google.com/spreadsheets/d/"+SHEET_ID+"/gviz/tq?tqx=out:
 function csv(t){const R=[];let r=[],c="",q=false;for(let i=0;i<t.length;i++){const ch=t[i];if(q){if(ch=='"'){if(t[i+1]=='"'){c+='"';i++}else q=false}else c+=ch}else if(ch=='"')q=true;else if(ch==","){r.push(c);c=""}else if(ch=="\n"||ch=="\r"){if(ch=="\r"&&t[i+1]=="\n")i++;r.push(c);c="";R.push(r);r=[]}else c+=ch}if(c||r.length){r.push(c);R.push(r)}return R}
 const num=v=>{const x=parseFloat(String(v==null?"":v).replace(/[,%\s]/g,""));return isFinite(x)?x:0};
 function pdate(s){s=(s||"").trim();let m=s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);if(m)return new Date(+m[1],m[2]-1,+m[3]);m=s.match(/^(\d{1,2})[\/.\-](\d{1,2})[\/.\-](\d{2,4})/);if(m){let a=+m[1],b=+m[2],y=+m[3];if(y<100)y+=2000;return b>12?new Date(y,a-1,b):new Date(y,b-1,a)}m=s.match(/^(\d{1,2})[\s\-\/.,]*([A-Za-z]{3,9})[\s\-\/.,]*(\d{2,4})/);if(m){const mi="jan feb mar apr may jun jul aug sep oct nov dec".split(" ").indexOf(m[2].slice(0,3).toLowerCase());let y=+m[3];if(y<100)y+=2000;if(mi>=0)return new Date(y,mi,+m[1])}return null}
+function e1d(e){if(!e)return null;const T=new Date();let m=e.match(/^(\d{1,2})(?:\.0+)?$/);if(m){const n=+m[1];if(n<1||n>31)return null;return new Date(T.getFullYear(),n>T.getDate()?T.getMonth()-1:T.getMonth(),n)}
+m=e.match(/^(\d{1,2})(?:st|nd|rd|th)?[\s\-\/.,]+([A-Za-z]{3,9})(?:[\s\-\/.,]+(\d{2,4}))?/);if(m){const mi="jan feb mar apr may jun jul aug sep oct nov dec".split(" ").indexOf(m[2].slice(0,3).toLowerCase());if(mi>=0){let y=m[3]?+m[3]:T.getFullYear();if(y<100)y+=2000;return new Date(y,mi,+m[1])}}
+const d=pdate(e);if(d)return d;m=e.match(/(\d{1,2})/);if(m&&+m[1]>=1&&+m[1]<=31)return new Date(T.getFullYear(),T.getMonth(),+m[1]);return null}
 // Sheet layout: A Wing, B Region, C Territory, then 7 category blocks (CSD, Water, RB Oil, Noodles, Rice, Sugar, Tea) of 7 columns each:
 // Target, Till Tar, Primary, Delivery, Secondary, Sec %, Stock. Stock is read (v[4]); Sec % column is not used.
 function parse(t){const R=csv(t);let off=num((R[0]||[])[1]),dt=null; // Day Off is always read from cell B1
-dt=null;{const e=String((R[0]||[])[4]||"").trim(),T=new Date(); // Latest date: E1 holds the day number (e.g. 16) of the current month
-if(/^\d{1,2}$/.test(e)){const n=+e;if(n>=1&&n<=31){const mo=n>T.getDate()?T.getMonth()-1:T.getMonth();dt=new Date(T.getFullYear(),mo,n)}}else dt=pdate(e)}
+let e1=String((R[0]||[])[4]==null?"":(R[0]||[])[4]).trim();dt=e1d(e1); // Latest date: cell E1 (day number like 16 => 16th of current month; full dates also work)
 if(!dt)R.slice(0,3).forEach(r=>r.forEach((c,i)=>{const k=(c||"").trim().toLowerCase();if(k.startsWith("date"))dt=pdate(r.slice(i+1).find(x=>x&&x.trim()))}));
 const rows=R.filter((r,ri)=>ri>0&&r[0]&&r[1]&&r[2]&&r[0].trim().toLowerCase()!="wing"&&/\d/.test(r[3]||"")).map(r=>[r[0].trim(),r[1].trim(),r[2].trim(),...CATS.map((_,i)=>{const b=3+7*i;return[num(r[b]),num(r[b+2]),num(r[b+3]),num(r[b+4]),num(r[b+6]),num(r[b+1])]})]);
-if(!rows.length)throw new Error("no data rows found");return{rows,off,dt}}
+if(!rows.length)throw new Error("no data rows found");return{rows,off,dt,e1}}
 async function fetchSheet(){let err;for(const u of SRC){try{const r=await fetch(u+"&_="+Date.now(),{cache:"no-store"});if(!r.ok)throw new Error("HTTP "+r.status);const t=await r.text();if(/^\s*</.test(t))throw new Error("sheet is not public");return parse(t)}catch(e){err=e}}throw err}
 function apply(p){D=p.rows;window.OFF=p.off;const k={w:$("fw").value,g:$("fr").value,t:$("ft").value},has=(s,v)=>[...s.options].some(o=>o.value==v);
 fill($("fw"),uniq(D.map(r=>r[0])),"All wings");if(has($("fw"),k.w))$("fw").value=k.w;
@@ -324,7 +326,7 @@ $("hdate").textContent=d.toLocaleDateString("en-GB",{day:"2-digit",month:"short"
 $("hmon").textContent=d.toLocaleDateString("en-GB",{month:"long",year:"numeric"});
 go()}
 function stat(msg,err){const s=$("st");s.classList.toggle("err",!!err);$("stt").textContent=msg}
-async function loadData(silent){const b=$("rf"),L=$("ld");b.disabled=true;b.classList.add("busy");if(silent!==true)L.classList.add("show");try{apply(await fetchSheet());stat("● Live from Google Sheet · updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})+" · auto-refresh every 5 min")}catch(e){stat("Loading failed",true)}b.disabled=false;b.classList.remove("busy");L.classList.remove("show")}
+async function loadData(silent){const b=$("rf"),L=$("ld");b.disabled=true;b.classList.add("busy");if(silent!==true)L.classList.add("show");try{const P=await fetchSheet();apply(P);stat("● Live from Google Sheet · E1 = "+(P.e1===""?"empty (using today)":"\""+P.e1+"\"")+" · updated "+new Date().toLocaleTimeString("en-GB",{hour:"2-digit",minute:"2-digit"})+" · auto-refresh every 5 min")}catch(e){stat("Loading failed",true)}b.disabled=false;b.classList.remove("busy");L.classList.remove("show")}
 $("rf").onclick=()=>loadData();
 setInterval(()=>loadData(true),REFRESH_MS);
 loadData();
